@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>WorthMe</title>
+  <rect width="64" height="64" rx="16" fill="#061a39"/>
+  <path fill="#fff" d="M7 17h5l3 18 4-12h5l4 12 3-18h5l-5 30h-6l-4-12-4 12h-6z"/>
+  <path fill="#ffc700" d="M35 47V17h6l5 13 5-13h6v30h-5V28l-4 11h-4l-4-11v19z"/>
+  <path d="M12 52c12 4 29 4 40 0" fill="none" stroke="#ffc700" stroke-linecap="round" stroke-width="2.5"/>
+</svg>
