@@ -14,3 +14,5 @@
   .hero-visual{overflow:hidden;min-height:430px}
   .hero-person{width:auto;height:430px;left:8%;bottom:0}
 }
+/* Keep the yellow word emphasis without a line that can cross the headline. */
+.hero-copy h1 mark:after{display:none}
