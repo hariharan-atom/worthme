@@ -1,12 +1,13 @@
 "use client";
 
 import NextImage from "next/image";
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Answers } from "@/lib/worth";
 
 const empty: Answers = { name: "", age: 18, profession: "", income: "", location: "", goal: "" };
 const profileTargetBytes = 72 * 1024;
+type FormStep = "profile" | "details";
 
 function Logo({ className = "" }: { className?: string }) {
   return <NextImage className={`logo ${className}`} src="/brand/worthme-logo.png" alt="WorthMe - Discover. Laugh. Improve." width={903} height={301} priority />;
@@ -37,17 +38,44 @@ async function compressProfile(file: File) {
 
 export default function Home() {
   const router = useRouter();
+  const modalTitleRef = useRef<HTMLHeadingElement>(null);
+  const modalRef = useRef<HTMLElement>(null);
   const [answers, setAnswers] = useState<Answers>(empty);
   const [stage, setStage] = useState<"form" | "reveal">("form");
+  const [formStep, setFormStep] = useState<FormStep>("profile");
+  const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [compressing, setCompressing] = useState(false);
+
   useEffect(() => {
     const observer = new IntersectionObserver((items) => items.forEach((item) => item.isIntersecting && item.target.classList.add("shown")), { threshold: 0.14 });
     document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setModalOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const focusable = modalRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex=\"-1\"])");
+      if (!focusable?.length) return;
+      const first = focusable[0]; const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    requestAnimationFrame(() => modalTitleRef.current?.focus());
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", onKeyDown); };
+  }, [modalOpen]);
+
   const update = <K extends keyof Answers>(key: K, value: Answers[K]) => setAnswers((previous) => ({ ...previous, [key]: value }));
+  const openQuiz = () => { setError(""); setStage("form"); setFormStep("profile"); setModalOpen(true); };
+  const closeQuiz = () => { if (!loading && !compressing) setModalOpen(false); };
+
   async function selectProfile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
     if (!file) return;
@@ -56,12 +84,20 @@ export default function Home() {
     catch (cause) { setError(cause instanceof Error ? cause.message : "We could not prepare that image."); event.currentTarget.value = ""; }
     finally { setCompressing(false); }
   }
-  function continueToReveal(event: FormEvent) {
+
+  function continueToDetails(event: FormEvent) {
     event.preventDefault();
     if (compressing) { setError("Your profile photo is still compressing."); return; }
-    if (answers.name.trim().length < 2 || answers.age < 18 || !answers.profession.trim() || !answers.income || !answers.location.trim() || answers.goal.trim().length < 3) { setError("Complete every field. WorthMe is for adults 18+."); return; }
+    if (answers.name.trim().length < 2 || answers.age < 18) { setError("Add your name and an age of 18 or above."); return; }
+    setError(""); setFormStep("details");
+  }
+
+  function continueToReveal(event: FormEvent) {
+    event.preventDefault();
+    if (!answers.profession.trim() || !answers.income || !answers.location.trim() || answers.goal.trim().length < 3) { setError("Complete the four details so we can make your score."); return; }
     setError(""); setStage("reveal");
   }
+
   async function generate() {
     setLoading(true); setError("");
     try {
@@ -77,12 +113,15 @@ export default function Home() {
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Something went sideways. Try again."); setLoading(false); }
   }
+
   return <main className="site-shell">
-    <nav className="site-nav"><a href="#top" aria-label="WorthMe home"><Logo /></a><div className="nav-links"><a href="#how">How it works</a><a href="#quiz">Why WorthMe?</a><a href="#quiz">FAQs</a></div><a className="nav-cta" href="#quiz">Find My Worth <span>→</span></a></nav>
-    <section id="top" className="brand-hero"><div className="hero-copy"><p className="eyebrow">DISCOVER. LAUGH. IMPROVE.</p><h1>How much<br />are <mark>you</mark> worth?</h1><p className="hero-lead">Give us 45 seconds. We&apos;ll make an unnecessarily serious valuation of you.</p><a className="primary-button" href="#quiz">Find My Worth <span aria-hidden="true">→</span></a><p className="hero-safe"><span className="lock" aria-hidden="true">⌁</span> Secure payment later · Just for fun · 18+ only</p></div><div className="hero-visual" aria-label="WorthMe score preview"><div className="scribble scribble-one">Just a quiz?</div><div className="scribble scribble-two">Or a reality<br />check?</div><NextImage className="hero-person" src="/brand/hero-thinker.png" alt="A thoughtful young professional" width={1024} height={1536} priority sizes="(max-width: 720px) 92vw, 48vw" /><div className="hero-score-card"><span className="mini-brand">Worth<span>Me</span></span><p>YOUR WORTH SCORE</p><strong>87<span>/100</span></strong><i>THE CHAOTIC BUILDER</i><div><b>Brain power</b><em style={{ width: "87%" }} /></div><div><b>Potential</b><em style={{ width: "94%" }} /></div></div></div></section>
+    <nav className="site-nav"><a href="#top" aria-label="WorthMe home"><Logo /></a><div className="nav-links"><a href="#how">How it works</a><a href="#why">Why WorthMe?</a><a href="#why">FAQs</a></div><button className="nav-cta" type="button" onClick={openQuiz}>Find My Worth <span aria-hidden="true">→</span></button></nav>
+    <section id="top" className="brand-hero"><div className="hero-copy"><p className="eyebrow">DISCOVER. LAUGH. IMPROVE.</p><h1>How much<br />are <mark>you</mark> worth?</h1><p className="hero-lead">Give us 45 seconds. We&apos;ll make an unnecessarily serious valuation of you.</p><a className="primary-button" href="#how">See how it works <span aria-hidden="true">↓</span></a><p className="hero-safe"><span className="lock" aria-hidden="true">⌁</span> No sign-up · Just for fun · 18+ only</p></div><div className="hero-visual" aria-label="WorthMe score preview"><div className="scribble scribble-one">Just a quiz?</div><div className="scribble scribble-two">Or a reality<br />check?</div><NextImage className="hero-person" src="/brand/hero-thinker.png" alt="A thoughtful young professional" width={1024} height={1536} priority sizes="(max-width: 720px) 92vw, 48vw" /><div className="hero-score-card"><span className="mini-brand">Worth<span>Me</span></span><p>YOUR WORTH SCORE</p><strong>87<span>/100</span></strong><i>THE CHAOTIC BUILDER</i><div><b>Brain power</b><em style={{ width: "87%" }} /></div><div><b>Potential</b><em style={{ width: "94%" }} /></div></div></div></section>
     <section id="how" className="how-section reveal"><p className="eyebrow centered">HOW WORTHME WORKS</p><h2>From curious to &ldquo;wow, that&apos;s me!&rdquo;<br />in 3 simple steps.</h2><div className="steps-grid"><article><span>1</span><h3>Answer a few questions</h3><p>Tell us a little about yourself. It takes just 45 seconds.</p></article><article><span>2</span><h3>Get your result</h3><p>We create your playful score, verdict, and share card.</p></article><article><span>3</span><h3>Discover & challenge</h3><p>Keep it to yourself or challenge a friend to beat you.</p></article></div></section>
-    <section className="challenge-band reveal"><div className="avatar-stack" aria-hidden="true"><i /><i /><i /></div><div><p className="eyebrow">THINK YOU&apos;RE WORTH MORE?</p><h2>&ldquo;I scored 87! Think you can beat me?&rdquo;</h2><p>Turn it into a friendly challenge. Compare scores with friends and see who&apos;s really worth more!</p></div><span className="challenge-note">Good conversations<br />start here!</span></section>
-    <section id="quiz" className="quiz-section"><div className="quiz-intro reveal"><p className="eyebrow">YOUR TURN</p><h2>Let&apos;s find your WorthMe score.</h2><p>Personal, playful, and always for entertainment. No account required.</p><div className="privacy-points"><p><b>◌</b> Your privacy matters</p><p><b>◌</b> 100% entertainment</p><p><b>◌</b> Made for adults</p></div></div>{stage === "form" ? <form className="quiz-form" onSubmit={continueToReveal} noValidate><div className="form-head"><span>01</span><div><strong>Tell us about you</strong><p>Six quick answers. Zero pressure.</p></div></div><div className="fields"><label>Your display name<input autoComplete="name" maxLength={28} value={answers.name} onChange={(e) => update("name", e.target.value)} placeholder="e.g. Hari" required /></label><label>Age<input type="number" min="18" max="120" value={answers.age || ""} onChange={(e) => update("age", Number(e.target.value))} required /></label><label>What do you do?<input maxLength={60} value={answers.profession} onChange={(e) => update("profession", e.target.value)} placeholder="e.g. Product designer" required /></label><label>Income range<select value={answers.income} onChange={(e) => update("income", e.target.value)} required><option value="">Choose a range</option><option>Building momentum</option><option>Growing steadily</option><option>Doing quite well</option><option>Prefer not to say</option></select></label><label>City or country<input maxLength={60} value={answers.location} onChange={(e) => update("location", e.target.value)} placeholder="e.g. Chennai, India" required /></label><label>What are you chasing?<input maxLength={120} value={answers.goal} onChange={(e) => update("goal", e.target.value)} placeholder="e.g. Launching my first company" required /></label></div><div className="profile-upload"><div className="profile-preview">{answers.profileImage ? <img src={answers.profileImage} alt="Selected profile preview" /> : <span aria-hidden="true">+</span>}</div><div><strong>Profile photo <small>optional</small></strong><p>Auto-compressed below 100 KB. It appears on your public result only when you share it.</p><label className="upload-button">{compressing ? "Compressing photo..." : "Choose photo"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={selectProfile} disabled={compressing} /></label>{answers.profileImage && <button className="remove-photo" type="button" onClick={() => update("profileImage", undefined)}>Remove</button>}</div></div>{error && <p className="error" role="alert">{error}</p>}<button className="primary-button full-button" type="submit" disabled={compressing}>Find My Worth <span aria-hidden="true">→</span></button><p className="form-note">For entertainment only. Not a financial, professional, or psychological assessment.</p></form> : <section className="launch-pass" aria-live="polite"><p className="eyebrow">LAUNCH PASS ACTIVATED</p><h3>Payment is on us for now.</h3><p>Our INR 29 payment step is paused during this launch preview. Your result is ready to reveal.</p>{error && <p className="error" role="alert">{error}</p>}<button className="primary-button" onClick={generate} disabled={loading}>{loading ? "Calculating your score..." : "Reveal My Worth"} <span aria-hidden="true">→</span></button><button className="text-button" type="button" onClick={() => setStage("form")}>Edit my answers</button></section>}</section>
-    <footer className="site-footer"><Logo /><div><a href="#top">About</a><a href="#quiz">Privacy</a><a href="#quiz">Terms</a><a href="#quiz">FAQs</a></div><p>Made with a little curiosity in India</p></footer>
+    <section id="why" className="challenge-band reveal"><div className="avatar-stack" aria-hidden="true"><i /><i /><i /></div><div><p className="eyebrow">THINK YOU&apos;RE WORTH MORE?</p><h2>&ldquo;I scored 87! Think you can beat me?&rdquo;</h2><p>Turn it into a friendly challenge. Compare scores with friends and see who&apos;s really worth more!</p></div><span className="challenge-note">Good conversations<br />start here!</span></section>
+    <section className="trust-strip reveal" aria-label="WorthMe promises"><p><b>◌</b> Your privacy matters</p><p><b>◌</b> 100% entertainment</p><p><b>◌</b> Made for adults</p></section>
+    <footer className="site-footer"><Logo /><div><a href="#top">About</a><a href="#why">Privacy</a><a href="#why">Terms</a><a href="#why">FAQs</a></div><p>Made with a little curiosity in India</p></footer>
+
+    {modalOpen && <div className="quiz-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeQuiz(); }}><section ref={modalRef} className="quiz-modal" role="dialog" aria-modal="true" aria-labelledby="quiz-title"><button className="modal-close" type="button" onClick={closeQuiz} disabled={loading || compressing} aria-label="Close WorthMe quiz"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button><div className="quiz-modal-top"><Logo className="modal-logo" /><ol className="modal-progress" aria-label={`Step ${formStep === "profile" ? 1 : 2} of 2`}><li className={formStep === "profile" ? "active" : "complete"}><span>1</span>Profile</li><li className={formStep === "details" ? "active" : ""}><span>2</span>Details</li></ol></div>{stage === "form" ? <form className="modal-form" onSubmit={formStep === "profile" ? continueToDetails : continueToReveal} noValidate>{formStep === "profile" ? <div className="modal-step"><p className="eyebrow">STEP 01 · YOUR PROFILE</p><h2 id="quiz-title" ref={modalTitleRef} tabIndex={-1}>Start with the basics.</h2><p className="modal-lead">Your photo is optional. If you choose one, it&apos;s compressed below 100 KB before it can be stored.</p><div className="profile-upload profile-card"><div className="profile-preview">{answers.profileImage ? <img src={answers.profileImage} alt="Selected profile preview" /> : <span aria-hidden="true">+</span>}</div><div><strong>Profile photo <small>optional</small></strong><p>Only appears on a result you choose to share.</p><label className="upload-button">{compressing ? "Compressing photo..." : "Choose photo"}<input type="file" accept="image/jpeg,image/png,image/webp" onChange={selectProfile} disabled={compressing} /></label>{answers.profileImage && <button className="remove-photo" type="button" onClick={() => update("profileImage", undefined)}>Remove</button>}</div></div><div className="fields profile-fields"><label>Your display name<input autoComplete="name" maxLength={28} value={answers.name} onChange={(e) => update("name", e.target.value)} placeholder="e.g. Hari" required /></label><label>Age<input type="number" min="18" max="120" value={answers.age || ""} onChange={(e) => update("age", Number(e.target.value))} required /></label></div></div> : <div className="modal-step"><p className="eyebrow">STEP 02 · THE DETAILS</p><h2 id="quiz-title" ref={modalTitleRef} tabIndex={-1}>What&apos;s your world like?</h2><p className="modal-lead">Four quick details. This is just for a playful result, never a serious valuation.</p><div className="fields"><label>What do you do?<input maxLength={60} value={answers.profession} onChange={(e) => update("profession", e.target.value)} placeholder="e.g. Product designer" required /></label><label>Income range<select value={answers.income} onChange={(e) => update("income", e.target.value)} required><option value="">Choose a range</option><option>Below ₹2 lakh</option><option>₹2 lakh – ₹4 lakh</option><option>₹4 lakh – ₹8 lakh</option><option>₹8 lakh – ₹15 lakh</option><option>₹15 lakh – ₹30 lakh</option><option>Above ₹30 lakh</option><option>Prefer not to say</option></select></label><label>City<input maxLength={60} value={answers.location} onChange={(e) => update("location", e.target.value)} placeholder="e.g. Chennai" required /></label><label>What are you chasing?<input maxLength={120} value={answers.goal} onChange={(e) => update("goal", e.target.value)} placeholder="e.g. Launching my first company" required /></label></div></div>}{error && <p className="error" role="alert">{error}</p>}<div className="modal-actions">{formStep === "details" && <button className="text-button modal-back" type="button" onClick={() => { setError(""); setFormStep("profile"); }}>Back</button>}<button className="primary-button" type="submit" disabled={compressing}>{formStep === "profile" ? "Continue to details" : "See my result"} <span aria-hidden="true">→</span></button></div></form> : <section className="launch-pass modal-reveal" aria-live="polite"><p className="eyebrow">YOUR SCORE IS READY</p><h2 id="quiz-title" ref={modalTitleRef} tabIndex={-1}>Let&apos;s reveal it.</h2><p>Your launch result is ready whenever you are.</p>{error && <p className="error" role="alert">{error}</p>}<button className="primary-button" onClick={generate} disabled={loading}>{loading ? "Calculating your score..." : "Reveal My Worth"} <span aria-hidden="true">→</span></button><button className="text-button" type="button" onClick={() => { setError(""); setStage("form"); setFormStep("details"); }}>Edit my details</button></section>}</section></div>}
   </main>;
 }
