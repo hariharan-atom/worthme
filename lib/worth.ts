@@ -5,6 +5,7 @@ export type Answers = {
   income: string;
   location: string;
   goal: string;
+  profileImage?: string;
 };
 
 export type PublicResult = {
@@ -18,7 +19,14 @@ export type PublicResult = {
   upgrade: string;
   scores: { label: string; value: number }[];
   createdAt: string;
+  profileImage?: string;
 };
+
+export const MAX_PROFILE_DATA_URL_BYTES = 100 * 1024;
+
+export function isProfileImage(value: unknown): value is string {
+  return typeof value === "string" && value.length <= MAX_PROFILE_DATA_URL_BYTES && /^data:image\/(?:jpeg|webp);base64,[a-zA-Z0-9+/]+=*$/.test(value);
+}
 
 const types = ["The Intentional Builder", "The Curious Operator", "The Calm Overachiever", "The Quiet Catalyst", "The Unstoppable Experimenter"];
 const gaps = ["Consistency", "Focus", "Rest", "Follow-through", "Saying no"];
@@ -53,15 +61,16 @@ export function makeResult(input: Answers, slug = crypto.randomUUID().replaceAll
     score,
     valuation,
     humanType: types[seed % types.length],
-    verdict: `${input.name.trim()}, you have the energy of someone who can make ${input.goal.trim().slice(0, 48)} happen — once your calendar stops accepting every random invitation. Serious momentum, selectively deployed.`,
+    verdict: `${input.name.trim()}, you have the energy of someone who can make ${input.goal.trim().slice(0, 48)} happen - once your calendar stops accepting every random invitation. Serious momentum, selectively deployed.`,
     valueGap: gap,
     upgrade: upgrades[gap],
     scores,
     createdAt: new Date().toISOString(),
+    profileImage: input.profileImage,
   };
 }
 
 export function isValidAnswers(value: unknown): value is Answers {
   const a = value as Answers;
-  return Boolean(a && typeof a.name === "string" && a.name.trim().length >= 2 && Number.isInteger(a.age) && a.age >= 18 && a.age <= 120 && typeof a.profession === "string" && a.profession.trim().length >= 2 && typeof a.income === "string" && typeof a.location === "string" && a.location.trim().length >= 2 && typeof a.goal === "string" && a.goal.trim().length >= 3);
+  return Boolean(a && typeof a.name === "string" && a.name.trim().length >= 2 && Number.isInteger(a.age) && a.age >= 18 && a.age <= 120 && typeof a.profession === "string" && a.profession.trim().length >= 2 && typeof a.income === "string" && typeof a.location === "string" && a.location.trim().length >= 2 && typeof a.goal === "string" && a.goal.trim().length >= 3 && (a.profileImage === undefined || isProfileImage(a.profileImage)));
 }

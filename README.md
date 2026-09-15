@@ -17,7 +17,7 @@ Import the GitHub repository in Vercel, set the three variables from `.env.local
 
 ## Privacy & product decisions
 
-- Only the display result is persisted; raw form answers are not written to the database.
+- Only the display result is persisted; raw form answers are not written to the database. An optional profile photo is browser-compressed and the stored data payload is limited to 100 KB.
 - The score is deterministic and entertainment-only—there is no AI provider in this build.
 - The product is 18+ and intentionally makes no real financial, employment, psychological, or human-value claim.
 - A full production launch still needs terms, privacy, retention/deletion handling, Razorpay integration, rate limiting, analytics consent, and legal review appropriate to launch markets.
