@@ -1,13 +1,30 @@
 import assert from "node:assert/strict";
-import { isProfileImage, makeResult, MAX_PROFILE_DATA_URL_BYTES } from "../lib/worth.ts";
-
-const input = { name: "Hari", age: 25, profession: "Designer", income: "Growing steadily", location: "Chennai", goal: "Building a useful product" };
+import { answerErrors, INCOME_RANGES, isProfileImage, isPublicResult, isValidAnswers, makeResult, MAX_PROFILE_DATA_URL_BYTES, RESULT_CATALOG } from "../lib/worth.ts";
+import { packResult, unpackResult } from "../lib/share.ts";
+const input = { name: "Hari", age: 25, profession: "Designer", income: INCOME_RANGES[1], location: "Chennai", goal: "Private launch plan" };
 const first = makeResult(input, "abc123def4");
-const second = makeResult(input, "abc123def4");
-
-assert.equal(first.score, second.score);
+assert.equal(first.score, makeResult(input, "abc123def4").score);
 assert.ok(first.score >= 64 && first.score <= 96);
+assert.equal(RESULT_CATALOG.length, 100);
+assert.equal(new Set(RESULT_CATALOG.map(r => JSON.stringify(r))).size, 100);
 assert.equal(first.scores.length, 5);
+assert.ok(first.scores.every(s => s.value >= 0 && s.value <= 100));
 assert.match(first.valuation, /^₹/);
+assert.ok(!first.verdict.includes(input.goal));
 assert.ok(isProfileImage("data:image/webp;base64,AA=="));
+assert.equal(isProfileImage("data:image/webp;base64,"), false);
+assert.equal(isProfileImage("data:image/svg+xml;base64,AAAA"), false);
 assert.equal(isProfileImage(`data:image/webp;base64,${"A".repeat(MAX_PROFILE_DATA_URL_BYTES)}`), false);
+assert.ok(isValidAnswers(input));
+for (const age of [17, 121, NaN, Infinity, 20.5]) assert.equal(isValidAnswers({ ...input, age }), false);
+for (const bad of [null, [], {}, { ...input, name: "x".repeat(100) }, { ...input, income: "" }, { ...input, goal: "x".repeat(121) }, { ...input, profileImage: "https://example.com/photo" }]) assert.equal(isValidAnswers(bad), false);
+assert.ok(answerErrors({ ...input, age: 200 }).age);
+assert.ok(isPublicResult(first));
+assert.equal(isPublicResult({ ...first, scores: null }), false);
+assert.equal(isPublicResult({ ...first, profileImage: "javascript:alert(1)" }), false);
+assert.deepEqual(unpackResult(packResult(first), first.slug), JSON.parse(JSON.stringify(first)));
+const unicode = makeResult({ ...input, name: "ஹரி 😊" }, "unicode123");
+assert.equal(unpackResult(packResult(unicode), unicode.slug)?.name, unicode.name);
+for (const encoded of ["bad!", "e30", "bnVsbA", "A".repeat(15000)]) assert.equal(unpackResult(encoded, first.slug), null);
+assert.equal(unpackResult(packResult(first), "different1"), null);
+console.log("Validation, 100-result catalog, privacy, and portable-link checks passed.");

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "WorthMe — an unnecessarily serious valuation",
-  description: "A playful, private, entertainment-only Worth Score.",
+  description: "Discover your playful Worth Score in 45 seconds. A free personality quiz with a personal card to download and share. For entertainment only.",
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
     shortcut: "/icon.svg",
