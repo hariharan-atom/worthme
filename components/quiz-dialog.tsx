@@ -6,6 +6,8 @@ import { compressProfile } from "@/lib/profile";
 import { packResult } from "@/lib/share";
 import { Icon, LoadingExperience, Logo } from "./brand";
 
+const MIN_RESULT_LOADING_MS = 5000;
+
 export default function QuizDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -93,12 +95,15 @@ export default function QuizDialog({ onClose }: { onClose: () => void }) {
     const controller = new AbortController();
     request.current = controller;
     const timeout = setTimeout(() => controller.abort(), 20000);
+    const loadingStartedAt = performance.now();
     try {
       const response = await fetch("/api/results", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(answers), signal: controller.signal });
       const body = await response.json();
       if (!alive.current || controller.signal.aborted) return;
       if (!response.ok) throw new Error(typeof body.error === "string" ? body.error : "We could not create your result.");
       if (!isPublicResult(body.result)) throw new Error("The result was incomplete. Please try again.");
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, MIN_RESULT_LOADING_MS - (performance.now() - loadingStartedAt))));
+      if (!alive.current || controller.signal.aborted) return;
       try { sessionStorage.setItem(`worthme:${body.result.slug}`, JSON.stringify(body.result)); } catch { /* Sharing still works when browser storage is blocked. */ }
       router.push(body.stored ? `/r/${body.result.slug}` : `/r/${body.result.slug}?d=${packResult(body.result)}`);
     } catch (cause) {

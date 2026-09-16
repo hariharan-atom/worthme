@@ -79,8 +79,10 @@ test("photo compression, invalid photo recovery, full generation and portable sh
   const photo = await page.getByAltText("Your selected profile photo").getAttribute("src");
   expect(photo!.length).toBeLessThanOrEqual(102400);
   await profile(page); await details(page);
+  const loadingStartedAt = Date.now();
   await page.getByRole("dialog").getByRole("button", { name: "Reveal My Worth", exact: true }).click();
-  await expect(page).toHaveURL(/\/r\/[a-z0-9]{10}\?d=/);
+  await expect(page).toHaveURL(/\/r\/[a-z0-9]{10}\?d=/, { timeout: 7000 });
+  expect(Date.now() - loadingStartedAt).toBeGreaterThanOrEqual(4800);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Hari");
   await expect(page.getByText("THE WORTHME VERDICT", { exact: true })).toBeVisible();
   const fresh = await browser.newContext();
